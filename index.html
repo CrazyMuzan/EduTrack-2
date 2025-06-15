@@ -1,0 +1,1161 @@
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Progress Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Firebase App (the core Firebase SDK) -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+    <!-- Firebase Auth -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+    <!-- Firebase Firestore -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore-compat.js"></script>
+    <!-- Firebase Storage -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-storage-compat.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+        .login-bg {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+        }
+        .card {
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+        .progress-ring__circle {
+            stroke-dasharray: 251.2;
+            stroke-dashoffset: 0;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+        .modal {
+            transition: opacity 0.25s ease;
+        }
+        .modal-container {
+            transition: transform 0.25s ease;
+        }
+        .modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .modal.active .modal-container {
+            transform: scale(1);
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="min-h-screen flex items-center justify-center login-bg">
+        <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-md">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-800">Student Dashboard</h1>
+                <p class="text-gray-600 mt-2">Sign in to access student records</p>
+            </div>
+            <form id="login-form" class="space-y-6">
+                <div>
+                    <label for="email" class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" id="email" name="email" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+                </div>
+                <div>
+                    <label for="password" class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" id="password" name="password" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+                </div>
+                <div>
+                    <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                        Sign in
+                    </button>
+                </div>
+                <div id="login-error" class="text-red-500 text-center hidden">
+                    Invalid credentials. Please try again.
+                </div>
+            </form>
+            <div class="mt-4 text-sm text-gray-600 text-center">
+                <p>Demo credentials: admin@school.edu / password123</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div id="main-dashboard" class="hidden">
+        <!-- Header -->
+        <header class="bg-white shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
+                <div class="flex items-center">
+                    <div class="bg-indigo-600 rounded-lg p-2 mr-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                        </svg>
+                    </div>
+                    <h1 class="text-xl font-bold text-gray-800">Student Progress Dashboard</h1>
+                </div>
+                <div class="flex items-center">
+                    <span class="text-gray-700 mr-4">Welcome, Admin</span>
+                    <button id="logout-btn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Section Selection -->
+            <div id="section-selection" class="mb-8">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Select a Section</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+                    <div class="bg-white rounded-lg shadow-md p-6 card cursor-pointer hover:bg-indigo-50" data-section="1">
+                        <h3 class="text-xl font-semibold text-indigo-600">Section 1</h3>
+                        <p class="text-gray-600 mt-2">70 Students</p>
+                        <div class="mt-4 flex justify-between items-center">
+                            <span class="text-sm text-gray-500">Grade 10</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-6 card cursor-pointer hover:bg-indigo-50" data-section="2">
+                        <h3 class="text-xl font-semibold text-indigo-600">Section 2</h3>
+                        <p class="text-gray-600 mt-2">70 Students</p>
+                        <div class="mt-4 flex justify-between items-center">
+                            <span class="text-sm text-gray-500">Grade 10</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-6 card cursor-pointer hover:bg-indigo-50" data-section="3">
+                        <h3 class="text-xl font-semibold text-indigo-600">Section 3</h3>
+                        <p class="text-gray-600 mt-2">70 Students</p>
+                        <div class="mt-4 flex justify-between items-center">
+                            <span class="text-sm text-gray-500">Grade 10</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-6 card cursor-pointer hover:bg-indigo-50" data-section="4">
+                        <h3 class="text-xl font-semibold text-indigo-600">Section 4</h3>
+                        <p class="text-gray-600 mt-2">70 Students</p>
+                        <div class="mt-4 flex justify-between items-center">
+                            <span class="text-sm text-gray-500">Grade 10</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg shadow-md p-6 card cursor-pointer hover:bg-indigo-50" data-section="5">
+                        <h3 class="text-xl font-semibold text-indigo-600">Section 5</h3>
+                        <p class="text-gray-600 mt-2">70 Students</p>
+                        <div class="mt-4 flex justify-between items-center">
+                            <span class="text-sm text-gray-500">Grade 10</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-indigo-500" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Student List -->
+            <div id="student-list-container" class="hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <div class="flex items-center">
+                        <button id="back-to-sections" class="mr-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                            </svg>
+                            Back
+                        </button>
+                        <h2 class="text-2xl font-bold text-gray-800" id="section-title">Section 1 Students</h2>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="relative mr-4">
+                            <input type="text" id="student-search" placeholder="Search students..." class="pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400 absolute left-3 top-2.5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <button id="add-student-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd" />
+                            </svg>
+                            Add Student
+                        </button>
+                    </div>
+                </div>
+
+                <div class="bg-white shadow-md rounded-lg overflow-hidden">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gender</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Average</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="student-list" class="bg-white divide-y divide-gray-200">
+                            <!-- Student rows will be dynamically inserted here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Student Profile -->
+            <div id="student-profile" class="hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <button id="back-to-list" class="bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clip-rule="evenodd" />
+                        </svg>
+                        Back to List
+                    </button>
+                    <button id="edit-student-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                        </svg>
+                        Edit Profile
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Student Info Card -->
+                    <div class="bg-white rounded-lg shadow-md p-6">
+                        <div class="flex flex-col items-center">
+                            <div class="w-32 h-32 rounded-full overflow-hidden mb-4 border-4 border-indigo-100" id="student-avatar-container">
+                                <!-- Student avatar will be inserted here -->
+                            </div>
+                            <h3 class="text-xl font-bold text-gray-800" id="student-name">Student Name</h3>
+                            <p class="text-gray-600" id="student-id">ID: 12345</p>
+                            <div class="mt-6 w-full">
+                                <div class="flex justify-between mb-2">
+                                    <span class="text-sm font-medium text-gray-600">Overall Progress</span>
+                                    <span class="text-sm font-medium text-indigo-600" id="overall-percentage">85%</span>
+                                </div>
+                                <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                    <div class="bg-indigo-600 h-2.5 rounded-full" id="overall-progress-bar" style="width: 85%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-6 border-t pt-6">
+                            <h4 class="text-lg font-semibold text-gray-700 mb-4">Student Information</h4>
+                            <div class="space-y-3">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Gender:</span>
+                                    <span class="font-medium text-gray-800" id="student-gender">Male</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Section:</span>
+                                    <span class="font-medium text-gray-800" id="student-section">Section 1</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Email:</span>
+                                    <span class="font-medium text-gray-800" id="student-email">student@school.edu</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Contact:</span>
+                                    <span class="font-medium text-gray-800" id="student-contact">(123) 456-7890</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mt-6 border-t pt-6">
+                            <h4 class="text-lg font-semibold text-gray-700 mb-4">About Student</h4>
+                            <p class="text-gray-600" id="student-description">
+                                Student description will appear here.
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Grades and Progress -->
+                    <div class="lg:col-span-2">
+                        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+                            <h3 class="text-lg font-semibold text-gray-700 mb-4">Quarterly Performance</h3>
+                            <div class="h-64">
+                                <canvas id="quarterly-chart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-lg shadow-md p-6">
+                            <div class="flex justify-between items-center mb-6">
+                                <h3 class="text-lg font-semibold text-gray-700">Detailed Grades</h3>
+                                <div class="flex items-center">
+                                    <div class="relative mr-4">
+                                        <select id="quarter-selector" class="block appearance-none bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                                            <option value="1">Quarter 1</option>
+                                            <option value="2">Quarter 2</option>
+                                            <option value="3">Quarter 3</option>
+                                            <option value="4">Quarter 4</option>
+                                        </select>
+                                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                                            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                    <button id="edit-grades-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                                        </svg>
+                                        Edit Grades
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Component</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weight</th>
+                                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Weighted Score</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="grades-table" class="bg-white divide-y divide-gray-200">
+                                        <!-- Grade rows will be dynamically inserted here -->
+                                    </tbody>
+                                    <tfoot class="bg-gray-50">
+                                        <tr>
+                                            <td colspan="3" class="px-6 py-3 text-right text-sm font-medium text-gray-900">Quarter Grade:</td>
+                                            <td class="px-6 py-3 text-sm font-bold text-indigo-600" id="quarter-grade">90.5</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Edit Student Profile Modal -->
+    <div id="edit-profile-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden modal">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 modal-container transform scale-95">
+            <div class="flex justify-between items-center border-b px-6 py-4">
+                <h3 class="text-lg font-semibold text-gray-900">Edit Student Profile</h3>
+                <button class="close-modal text-gray-400 hover:text-gray-500">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <form id="edit-profile-form" class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="edit-first-name" class="block text-sm font-medium text-gray-700">First Name</label>
+                        <input type="text" id="edit-first-name" name="firstName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="edit-last-name" class="block text-sm font-medium text-gray-700">Last Name</label>
+                        <input type="text" id="edit-last-name" name="lastName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="edit-gender" class="block text-sm font-medium text-gray-700">Gender</label>
+                        <select id="edit-gender" name="gender" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="edit-email" class="block text-sm font-medium text-gray-700">Email</label>
+                        <input type="email" id="edit-email" name="email" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="edit-contact" class="block text-sm font-medium text-gray-700">Contact</label>
+                        <input type="text" id="edit-contact" name="contact" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="edit-section" class="block text-sm font-medium text-gray-700">Section</label>
+                        <select id="edit-section" name="section" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                            <option value="1">Section 1</option>
+                            <option value="2">Section 2</option>
+                            <option value="3">Section 3</option>
+                            <option value="4">Section 4</option>
+                            <option value="5">Section 5</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <label for="edit-description" class="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea id="edit-description" name="description" rows="4" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"></textarea>
+                </div>
+                <div class="mt-6 flex justify-end">
+                    <button type="button" class="mr-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out close-modal">
+                        Cancel
+                    </button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Edit Grades Modal -->
+    <div id="edit-grades-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden modal">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 modal-container transform scale-95">
+            <div class="flex justify-between items-center border-b px-6 py-4">
+                <h3 class="text-lg font-semibold text-gray-900">Edit Student Grades</h3>
+                <button class="close-modal text-gray-400 hover:text-gray-500">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <form id="edit-grades-form" class="p-6">
+                <div class="mb-6">
+                    <label for="edit-quarter" class="block text-sm font-medium text-gray-700 mb-2">Quarter</label>
+                    <select id="edit-quarter" name="quarter" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="1">Quarter 1</option>
+                        <option value="2">Quarter 2</option>
+                        <option value="3">Quarter 3</option>
+                        <option value="4">Quarter 4</option>
+                    </select>
+                </div>
+                <div class="space-y-6">
+                    <div>
+                        <label for="edit-pt-score" class="block text-sm font-medium text-gray-700">Performance Tasks Score</label>
+                        <input type="number" id="edit-pt-score" name="ptScore" min="0" max="100" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="edit-ww-score" class="block text-sm font-medium text-gray-700">Written Works Score</label>
+                        <input type="number" id="edit-ww-score" name="wwScore" min="0" max="100" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                    <div>
+                        <label for="edit-qa-score" class="block text-sm font-medium text-gray-700">Quarterly Assessment Score</label>
+                        <input type="number" id="edit-qa-score" name="qaScore" min="0" max="100" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                    </div>
+                </div>
+                <div class="mt-6 flex justify-end">
+                    <button type="button" class="mr-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out close-modal">
+                        Cancel
+                    </button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Add Student Modal -->
+    <div id="add-student-modal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden modal">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 modal-container transform scale-95">
+            <div class="flex justify-between items-center border-b px-6 py-4">
+                <h3 class="text-lg font-semibold text-gray-900">Add New Student</h3>
+                <button class="close-modal text-gray-400 hover:text-gray-500">
+                    <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <form id="add-student-form" class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label for="add-first-name" class="block text-sm font-medium text-gray-700">First Name</label>
+                        <input type="text" id="add-first-name" name="firstName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+                    </div>
+                    <div>
+                        <label for="add-last-name" class="block text-sm font-medium text-gray-700">Last Name</label>
+                        <input type="text" id="add-last-name" name="lastName" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+                    </div>
+                    <div>
+                        <label for="add-gender" class="block text-sm font-medium text-gray-700">Gender</label>
+                        <select id="add-gender" name="gender" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="add-email" class="block text-sm font-medium text-gray-700">Email</label>
+                        <input type="email" id="add-email" name="email" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+                    </div>
+                    <div>
+                        <label for="add-contact" class="block text-sm font-medium text-gray-700">Contact</label>
+                        <input type="text" id="add-contact" name="contact" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+                    </div>
+                    <div>
+                        <label for="add-section" class="block text-sm font-medium text-gray-700">Section</label>
+                        <select id="add-section" name="section" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required>
+                            <option value="1">Section 1</option>
+                            <option value="2">Section 2</option>
+                            <option value="3">Section 3</option>
+                            <option value="4">Section 4</option>
+                            <option value="5">Section 5</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="mt-6">
+                    <label for="add-description" class="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea id="add-description" name="description" rows="4" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500" required></textarea>
+                </div>
+                <div class="mt-6 flex justify-end">
+                    <button type="button" class="mr-3 bg-gray-200 hover:bg-gray-300 text-gray-700 font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out close-modal">
+                        Cancel
+                    </button>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md transition duration-150 ease-in-out">
+                        Add Student
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 right-4 bg-green-500 text-white px-6 py-3 rounded-md shadow-lg transform transition-transform duration-300 translate-y-20 opacity-0 flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+        </svg>
+        <span id="toast-message">Changes saved successfully!</span>
+    </div>
+
+    <script>
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCjelf6cDjc91vaJERMF7hdbI0jBduKPyo",
+            authDomain: "edutracker-35a4e.firebaseapp.com",
+            projectId: "edutracker-35a4e",
+            storageBucket: "edutracker-35a4e.firebasestorage.app",
+            messagingSenderId: ".",
+            appId: "1:.:web:db7fb65f2c7b849673eb85",
+            measurementId: "G-SDLZ5Z7EJT"
+        };
+
+        // Initialize Firebase (simulation)
+        // In a real implementation, you would use:
+        // firebase.initializeApp(firebaseConfig);
+        // const auth = firebase.auth();
+        // const db = firebase.firestore();
+        // const storage = firebase.storage();
+
+        // Sample data - in a real app, this would come from Firebase
+        const sections = [
+            { id: 1, name: "Section 1", grade: "Grade 10", count: 70 },
+            { id: 2, name: "Section 2", grade: "Grade 10", count: 70 },
+            { id: 3, name: "Section 3", grade: "Grade 10", count: 70 },
+            { id: 4, name: "Section 4", grade: "Grade 10", count: 70 },
+            { id: 5, name: "Section 5", grade: "Grade 10", count: 70 }
+        ];
+
+        // Generate sample students
+        function generateStudents(sectionId, count) {
+            const students = [];
+            const firstNames = ["John", "Emma", "Michael", "Sophia", "William", "Olivia", "James", "Ava", "Alexander", "Isabella"];
+            const lastNames = ["Smith", "Johnson", "Williams", "Brown", "Jones", "Garcia", "Miller", "Davis", "Rodriguez", "Martinez"];
+            const genders = ["Male", "Female"];
+            
+            for (let i = 1; i <= count; i++) {
+                const firstName = firstNames[Math.floor(Math.random() * firstNames.length)];
+                const lastName = lastNames[Math.floor(Math.random() * lastNames.length)];
+                const gender = genders[Math.floor(Math.random() * genders.length)];
+                const id = `S${sectionId}${i.toString().padStart(3, '0')}`;
+                
+                // Generate random grades for each quarter
+                const quarters = [];
+                for (let q = 1; q <= 4; q++) {
+                    quarters.push({
+                        performanceTasks: {
+                            score: Math.floor(Math.random() * 21) + 80,
+                            weight: 0.4
+                        },
+                        writtenWorks: {
+                            score: Math.floor(Math.random() * 21) + 80,
+                            weight: 0.4
+                        },
+                        quarterlyAssessment: {
+                            score: Math.floor(Math.random() * 21) + 80,
+                            weight: 0.2
+                        }
+                    });
+                }
+                
+                // Calculate average
+                const averages = quarters.map(q => 
+                    (q.performanceTasks.score * q.performanceTasks.weight) + 
+                    (q.writtenWorks.score * q.writtenWorks.weight) + 
+                    (q.quarterlyAssessment.score * q.quarterlyAssessment.weight)
+                );
+                const currentAverage = averages.reduce((sum, val) => sum + val, 0) / averages.length;
+                
+                students.push({
+                    id,
+                    firstName,
+                    lastName,
+                    fullName: `${firstName} ${lastName}`,
+                    gender,
+                    email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@school.edu`,
+                    contact: `(${Math.floor(Math.random() * 900) + 100}) ${Math.floor(Math.random() * 900) + 100}-${Math.floor(Math.random() * 9000) + 1000}`,
+                    section: sectionId,
+                    quarters,
+                    currentAverage,
+                    description: `${firstName} ${lastName} is a dedicated student who consistently ${Math.random() > 0.5 ? 'excels in academic subjects' : 'shows great enthusiasm for learning'}. ${gender === 'Male' ? 'He' : 'She'} is ${Math.random() > 0.5 ? 'actively involved in extracurricular activities' : 'focused on academic excellence'} and demonstrates ${Math.random() > 0.5 ? 'strong leadership qualities' : 'excellent collaborative skills'}.`,
+                    avatar: gender === 'Male' ? 
+                        `<svg class="h-full w-full text-gray-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14.25c4.142 0 7.5 3.358 7.5 7.5H4.5c0-4.142 3.358-7.5 7.5-7.5zm0-1.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z"/></svg>` : 
+                        `<svg class="h-full w-full text-gray-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14.25c4.142 0 7.5 3.358 7.5 7.5H4.5c0-4.142 3.358-7.5 7.5-7.5zm0-1.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z"/></svg>`
+                });
+            }
+            
+            return students;
+        }
+
+        // Generate all students for all sections
+        const allStudents = {};
+        sections.forEach(section => {
+            allStudents[section.id] = generateStudents(section.id, section.count);
+        });
+
+        // Current state
+        let currentSection = null;
+        let currentStudent = null;
+        let quarterlyChart = null;
+
+        // DOM Elements
+        const loginScreen = document.getElementById('login-screen');
+        const mainDashboard = document.getElementById('main-dashboard');
+        const sectionSelection = document.getElementById('section-selection');
+        const studentListContainer = document.getElementById('student-list-container');
+        const studentProfile = document.getElementById('student-profile');
+        const sectionTitle = document.getElementById('section-title');
+        const studentList = document.getElementById('student-list');
+        const studentSearch = document.getElementById('student-search');
+        const backToSections = document.getElementById('back-to-sections');
+        const backToList = document.getElementById('back-to-list');
+        const quarterSelector = document.getElementById('quarter-selector');
+        const gradesTable = document.getElementById('grades-table');
+        const quarterGrade = document.getElementById('quarter-grade');
+        const editProfileModal = document.getElementById('edit-profile-modal');
+        const editGradesModal = document.getElementById('edit-grades-modal');
+        const addStudentModal = document.getElementById('add-student-modal');
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+
+        // Login form handling
+        document.getElementById('login-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            // Simple authentication (in a real app, this would use Firebase Auth)
+            if (email === 'admin@school.edu' && password === 'password123') {
+                loginScreen.classList.add('hidden');
+                mainDashboard.classList.remove('hidden');
+            } else {
+                document.getElementById('login-error').classList.remove('hidden');
+            }
+        });
+
+        // Logout button
+        document.getElementById('logout-btn').addEventListener('click', function() {
+            mainDashboard.classList.add('hidden');
+            loginScreen.classList.remove('hidden');
+            document.getElementById('login-error').classList.add('hidden');
+            document.getElementById('email').value = '';
+            document.getElementById('password').value = '';
+        });
+
+        // Section selection
+        document.querySelectorAll('[data-section]').forEach(element => {
+            element.addEventListener('click', function() {
+                const sectionId = parseInt(this.getAttribute('data-section'));
+                currentSection = sectionId;
+                sectionSelection.classList.add('hidden');
+                studentListContainer.classList.remove('hidden');
+                sectionTitle.textContent = `Section ${sectionId} Students`;
+                renderStudentList(sectionId);
+            });
+        });
+
+        // Back to sections button
+        backToSections.addEventListener('click', function() {
+            studentListContainer.classList.add('hidden');
+            sectionSelection.classList.remove('hidden');
+            currentSection = null;
+        });
+
+        // Back to list button
+        backToList.addEventListener('click', function() {
+            studentProfile.classList.add('hidden');
+            studentListContainer.classList.remove('hidden');
+            currentStudent = null;
+            if (quarterlyChart) {
+                quarterlyChart.destroy();
+                quarterlyChart = null;
+            }
+        });
+
+        // Student search
+        studentSearch.addEventListener('input', function() {
+            if (currentSection) {
+                renderStudentList(currentSection, this.value);
+            }
+        });
+
+        // Quarter selector
+        quarterSelector.addEventListener('change', function() {
+            if (currentStudent) {
+                renderGrades(currentStudent, parseInt(this.value));
+            }
+        });
+
+        // Edit student profile button
+        document.getElementById('edit-student-btn').addEventListener('click', function() {
+            if (currentStudent) {
+                // Populate form with current student data
+                document.getElementById('edit-first-name').value = currentStudent.firstName;
+                document.getElementById('edit-last-name').value = currentStudent.lastName;
+                document.getElementById('edit-gender').value = currentStudent.gender;
+                document.getElementById('edit-email').value = currentStudent.email;
+                document.getElementById('edit-contact').value = currentStudent.contact;
+                document.getElementById('edit-section').value = currentStudent.section;
+                document.getElementById('edit-description').value = currentStudent.description;
+                
+                // Show modal
+                editProfileModal.classList.remove('hidden');
+                editProfileModal.classList.add('active');
+            }
+        });
+
+        // Edit grades button
+        document.getElementById('edit-grades-btn').addEventListener('click', function() {
+            if (currentStudent) {
+                const currentQuarter = parseInt(quarterSelector.value);
+                const quarterData = currentStudent.quarters[currentQuarter - 1];
+                
+                // Populate form with current grade data
+                document.getElementById('edit-quarter').value = currentQuarter;
+                document.getElementById('edit-pt-score').value = quarterData.performanceTasks.score;
+                document.getElementById('edit-ww-score').value = quarterData.writtenWorks.score;
+                document.getElementById('edit-qa-score').value = quarterData.quarterlyAssessment.score;
+                
+                // Show modal
+                editGradesModal.classList.remove('hidden');
+                editGradesModal.classList.add('active');
+            }
+        });
+
+        // Add student button
+        document.getElementById('add-student-btn').addEventListener('click', function() {
+            // Reset form
+            document.getElementById('add-student-form').reset();
+            document.getElementById('add-section').value = currentSection;
+            
+            // Show modal
+            addStudentModal.classList.remove('hidden');
+            addStudentModal.classList.add('active');
+        });
+
+        // Close modals
+        document.querySelectorAll('.close-modal').forEach(button => {
+            button.addEventListener('click', function() {
+                editProfileModal.classList.remove('active');
+                editGradesModal.classList.remove('active');
+                addStudentModal.classList.remove('active');
+                
+                setTimeout(() => {
+                    editProfileModal.classList.add('hidden');
+                    editGradesModal.classList.add('hidden');
+                    addStudentModal.classList.add('hidden');
+                }, 250);
+            });
+        });
+
+        // Edit profile form submission
+        document.getElementById('edit-profile-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            if (currentStudent) {
+                // Update student data
+                currentStudent.firstName = document.getElementById('edit-first-name').value;
+                currentStudent.lastName = document.getElementById('edit-last-name').value;
+                currentStudent.fullName = `${currentStudent.firstName} ${currentStudent.lastName}`;
+                currentStudent.gender = document.getElementById('edit-gender').value;
+                currentStudent.email = document.getElementById('edit-email').value;
+                currentStudent.contact = document.getElementById('edit-contact').value;
+                
+                const newSection = parseInt(document.getElementById('edit-section').value);
+                if (newSection !== currentStudent.section) {
+                    // Move student to new section
+                    const index = allStudents[currentStudent.section].findIndex(s => s.id === currentStudent.id);
+                    if (index !== -1) {
+                        allStudents[currentStudent.section].splice(index, 1);
+                        currentStudent.section = newSection;
+                        allStudents[newSection].push(currentStudent);
+                    }
+                }
+                
+                currentStudent.description = document.getElementById('edit-description').value;
+                
+                // Update avatar based on gender
+                currentStudent.avatar = currentStudent.gender === 'Male' ? 
+                    `<svg class="h-full w-full text-gray-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14.25c4.142 0 7.5 3.358 7.5 7.5H4.5c0-4.142 3.358-7.5 7.5-7.5zm0-1.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z"/></svg>` : 
+                    `<svg class="h-full w-full text-gray-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14.25c4.142 0 7.5 3.358 7.5 7.5H4.5c0-4.142 3.358-7.5 7.5-7.5zm0-1.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z"/></svg>`;
+                
+                // Update UI
+                showStudentProfile(currentStudent);
+                
+                // Close modal
+                editProfileModal.classList.remove('active');
+                setTimeout(() => {
+                    editProfileModal.classList.add('hidden');
+                }, 250);
+                
+                // Show success toast
+                showToast('Profile updated successfully!');
+            }
+        });
+
+        // Edit grades form submission
+        document.getElementById('edit-grades-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            if (currentStudent) {
+                const quarter = parseInt(document.getElementById('edit-quarter').value);
+                const ptScore = parseFloat(document.getElementById('edit-pt-score').value);
+                const wwScore = parseFloat(document.getElementById('edit-ww-score').value);
+                const qaScore = parseFloat(document.getElementById('edit-qa-score').value);
+                
+                // Update grades
+                currentStudent.quarters[quarter - 1].performanceTasks.score = ptScore;
+                currentStudent.quarters[quarter - 1].writtenWorks.score = wwScore;
+                currentStudent.quarters[quarter - 1].quarterlyAssessment.score = qaScore;
+                
+                // Recalculate average
+                const averages = currentStudent.quarters.map(q => 
+                    (q.performanceTasks.score * q.performanceTasks.weight) + 
+                    (q.writtenWorks.score * q.writtenWorks.weight) + 
+                    (q.quarterlyAssessment.score * q.quarterlyAssessment.weight)
+                );
+                currentStudent.currentAverage = averages.reduce((sum, val) => sum + val, 0) / averages.length;
+                
+                // Update UI
+                renderGrades(currentStudent, quarter);
+                renderQuarterlyChart(currentStudent);
+                document.getElementById('overall-percentage').textContent = `${currentStudent.currentAverage.toFixed(1)}%`;
+                document.getElementById('overall-progress-bar').style.width = `${currentStudent.currentAverage}%`;
+                
+                // Close modal
+                editGradesModal.classList.remove('active');
+                setTimeout(() => {
+                    editGradesModal.classList.add('hidden');
+                }, 250);
+                
+                // Show success toast
+                showToast('Grades updated successfully!');
+            }
+        });
+
+        // Add student form submission
+        document.getElementById('add-student-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const firstName = document.getElementById('add-first-name').value;
+            const lastName = document.getElementById('add-last-name').value;
+            const gender = document.getElementById('add-gender').value;
+            const email = document.getElementById('add-email').value;
+            const contact = document.getElementById('add-contact').value;
+            const section = parseInt(document.getElementById('add-section').value);
+            const description = document.getElementById('add-description').value;
+            
+            // Generate ID
+            const id = `S${section}${(allStudents[section].length + 1).toString().padStart(3, '0')}`;
+            
+            // Generate default grades
+            const quarters = [];
+            for (let q = 1; q <= 4; q++) {
+                quarters.push({
+                    performanceTasks: {
+                        score: 80,
+                        weight: 0.4
+                    },
+                    writtenWorks: {
+                        score: 80,
+                        weight: 0.4
+                    },
+                    quarterlyAssessment: {
+                        score: 80,
+                        weight: 0.2
+                    }
+                });
+            }
+            
+            // Calculate average
+            const currentAverage = 80;
+            
+            // Create new student
+            const newStudent = {
+                id,
+                firstName,
+                lastName,
+                fullName: `${firstName} ${lastName}`,
+                gender,
+                email,
+                contact,
+                section,
+                quarters,
+                currentAverage,
+                description,
+                avatar: gender === 'Male' ? 
+                    `<svg class="h-full w-full text-gray-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14.25c4.142 0 7.5 3.358 7.5 7.5H4.5c0-4.142 3.358-7.5 7.5-7.5zm0-1.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z"/></svg>` : 
+                    `<svg class="h-full w-full text-gray-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 14.25c4.142 0 7.5 3.358 7.5 7.5H4.5c0-4.142 3.358-7.5 7.5-7.5zm0-1.5a4.5 4.5 0 100-9 4.5 4.5 0 000 9z"/></svg>`
+            };
+            
+            // Add to students array
+            allStudents[section].push(newStudent);
+            
+            // Update UI if we're in the same section
+            if (currentSection === section) {
+                renderStudentList(section);
+            }
+            
+            // Close modal
+            addStudentModal.classList.remove('active');
+            setTimeout(() => {
+                addStudentModal.classList.add('hidden');
+            }, 250);
+            
+            // Show success toast
+            showToast('Student added successfully!');
+        });
+
+        // Render student list for a section
+        function renderStudentList(sectionId, searchTerm = '') {
+            const students = allStudents[sectionId];
+            let filteredStudents = students;
+            
+            if (searchTerm) {
+                const term = searchTerm.toLowerCase();
+                filteredStudents = students.filter(student => 
+                    student.fullName.toLowerCase().includes(term) || 
+                    student.id.toLowerCase().includes(term)
+                );
+            }
+            
+            studentList.innerHTML = '';
+            
+            filteredStudents.forEach(student => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student.fullName}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student.gender}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student.currentAverage.toFixed(1)}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button class="text-indigo-600 hover:text-indigo-900 view-profile" data-id="${student.id}">View Profile</button>
+                    </td>
+                `;
+                studentList.appendChild(row);
+            });
+            
+            // Add event listeners to view profile buttons
+            document.querySelectorAll('.view-profile').forEach(button => {
+                button.addEventListener('click', function() {
+                    const studentId = this.getAttribute('data-id');
+                    const student = filteredStudents.find(s => s.id === studentId);
+                    if (student) {
+                        currentStudent = student;
+                        showStudentProfile(student);
+                    }
+                });
+            });
+        }
+
+        // Show student profile
+        function showStudentProfile(student) {
+            studentListContainer.classList.add('hidden');
+            studentProfile.classList.remove('hidden');
+            
+            // Set student info
+            document.getElementById('student-name').textContent = student.fullName;
+            document.getElementById('student-id').textContent = `ID: ${student.id}`;
+            document.getElementById('student-gender').textContent = student.gender;
+            document.getElementById('student-section').textContent = `Section ${student.section}`;
+            document.getElementById('student-email').textContent = student.email;
+            document.getElementById('student-contact').textContent = student.contact;
+            document.getElementById('student-description').textContent = student.description;
+            document.getElementById('student-avatar-container').innerHTML = student.avatar;
+            
+            // Set overall progress
+            const overallPercentage = student.currentAverage;
+            document.getElementById('overall-percentage').textContent = `${overallPercentage.toFixed(1)}%`;
+            document.getElementById('overall-progress-bar').style.width = `${overallPercentage}%`;
+            
+            // Render grades for first quarter by default
+            quarterSelector.value = "1";
+            renderGrades(student, 1);
+            
+            // Render quarterly chart
+            renderQuarterlyChart(student);
+        }
+
+        // Render grades for a specific quarter
+        function renderGrades(student, quarter) {
+            const quarterData = student.quarters[quarter - 1];
+            gradesTable.innerHTML = '';
+            
+            // Performance Tasks
+            const ptRow = document.createElement('tr');
+            const ptWeightedScore = quarterData.performanceTasks.score * quarterData.performanceTasks.weight;
+            ptRow.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Performance Tasks</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${quarterData.performanceTasks.score}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${quarterData.performanceTasks.weight * 100}%</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${ptWeightedScore.toFixed(1)}</td>
+            `;
+            gradesTable.appendChild(ptRow);
+            
+            // Written Works
+            const wwRow = document.createElement('tr');
+            const wwWeightedScore = quarterData.writtenWorks.score * quarterData.writtenWorks.weight;
+            wwRow.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Written Works</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${quarterData.writtenWorks.score}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${quarterData.writtenWorks.weight * 100}%</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${wwWeightedScore.toFixed(1)}</td>
+            `;
+            gradesTable.appendChild(wwRow);
+            
+            // Quarterly Assessment
+            const qaRow = document.createElement('tr');
+            const qaWeightedScore = quarterData.quarterlyAssessment.score * quarterData.quarterlyAssessment.weight;
+            qaRow.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">Quarterly Assessment</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${quarterData.quarterlyAssessment.score}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${quarterData.quarterlyAssessment.weight * 100}%</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${qaWeightedScore.toFixed(1)}</td>
+            `;
+            gradesTable.appendChild(qaRow);
+            
+            // Set quarter grade
+            const totalGrade = ptWeightedScore + wwWeightedScore + qaWeightedScore;
+            quarterGrade.textContent = totalGrade.toFixed(1);
+        }
+
+        // Render quarterly chart
+        function renderQuarterlyChart(student) {
+            const ctx = document.getElementById('quarterly-chart').getContext('2d');
+            
+            // Calculate quarter grades
+            const quarterGrades = student.quarters.map((q, index) => {
+                const ptScore = q.performanceTasks.score * q.performanceTasks.weight;
+                const wwScore = q.writtenWorks.score * q.writtenWorks.weight;
+                const qaScore = q.quarterlyAssessment.score * q.quarterlyAssessment.weight;
+                return ptScore + wwScore + qaScore;
+            });
+            
+            // Component scores for each quarter
+            const ptScores = student.quarters.map(q => q.performanceTasks.score);
+            const wwScores = student.quarters.map(q => q.writtenWorks.score);
+            const qaScores = student.quarters.map(q => q.quarterlyAssessment.score);
+            
+            if (quarterlyChart) {
+                quarterlyChart.destroy();
+            }
+            
+            quarterlyChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Quarter 1', 'Quarter 2', 'Quarter 3', 'Quarter 4'],
+                    datasets: [
+                        {
+                            label: 'Performance Tasks',
+                            data: ptScores,
+                            backgroundColor: 'rgba(79, 70, 229, 0.7)',
+                            borderColor: 'rgba(79, 70, 229, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Written Works',
+                            data: wwScores,
+                            backgroundColor: 'rgba(16, 185, 129, 0.7)',
+                            borderColor: 'rgba(16, 185, 129, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Quarterly Assessment',
+                            data: qaScores,
+                            backgroundColor: 'rgba(245, 158, 11, 0.7)',
+                            borderColor: 'rgba(245, 158, 11, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            type: 'line',
+                            label: 'Quarter Grade',
+                            data: quarterGrades,
+                            backgroundColor: 'rgba(239, 68, 68, 0.2)',
+                            borderColor: 'rgba(239, 68, 68, 1)',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.1,
+                            pointBackgroundColor: 'rgba(239, 68, 68, 1)',
+                            pointRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            min: 70,
+                            max: 100
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
+
+        // Show toast notification
+        function showToast(message) {
+            toastMessage.textContent = message;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Firebase integration notes (for real implementation)
+        /*
+        In a real implementation with Firebase, you would:
+        
+        1. Authentication:
+           - Use firebase.auth().signInWithEmailAndPassword(email, password) for login
+           - Use firebase.auth().onAuthStateChanged() to check auth state
+           - Use firebase.auth().signOut() for logout
+        
+        2. Firestore Database:
+           - Store sections in a 'sections' collection
+           - Store students in a 'students' collection with section as a field
+           - Use db.collection('students').where('section', '==', sectionId).get() to fetch students
+           - Use db.collection('students').doc(studentId).get() to fetch a specific student
+           - Use db.collection('students').doc(studentId).update({...}) to update student data
+           - Use db.collection('students').add({...}) to add a new student
+        
+        3. Storage:
+           - Store student profile images in Firebase Storage
+           - Use storage.ref(`students/${studentId}/profile.jpg`).put(file) to upload images
+           - Use storage.ref(`students/${studentId}/profile.jpg`).getDownloadURL() to get image URLs
+        */
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'95002470d721bc39',t:'MTc0OTk3MDMyMi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
