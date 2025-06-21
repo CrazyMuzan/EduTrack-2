@@ -402,18 +402,7 @@
         
         // Initialize app
         document.addEventListener('DOMContentLoaded', function() {
-            // Login form
-            document.getElementById('loginForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                if (document.getElementById('username').value === 'admin' && document.getElementById('password').value === 'password') {
-                    document.getElementById('loginPage').classList.add('hidden');
-                    document.getElementById('mainDashboard').classList.remove('hidden');
-                    updateSectionCounts();
-                } else {
-                    alert('Invalid credentials');
-                }
-            });
-            
+        
             // Navigation
             document.getElementById('backToSectionsBtn').addEventListener('click', () => {
                 showView('sectionsView');
