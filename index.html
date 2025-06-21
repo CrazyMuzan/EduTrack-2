@@ -386,832 +386,684 @@
         </div>
     </div>
 
-    <script>
-        // Data storage
-        const students = {};
-        const sections = {
-            'A':{name:'Section A',color:'blue'},
-            'B':{name:'Section B',color:'purple'},
-            'C':{name:'Section C',color:'green'},
-            'D':{name:'Section D',color:'red'},
-            'E':{name:'Section E',color:'amber'}
-        };
-        let currentSection = '';
-        let currentStudent = '';
-        let currentQuarter = 1;
-        let currentChartType = 'quarter';
-        let performanceChart = null;
-        
-        // Initialize app
-        document.addEventListener('DOMContentLoaded', function() {
-        
-            // Navigation
-            document.getElementById('backToSectionsBtn').addEventListener('click', () => {
-                showView('sectionsView');
-                updateSectionCounts();
-                db.collection("students").onSnapshot((querySnapshot) => {
-                students = {};
-                querySnapshot.forEach((doc) => {
-                    students[doc.id] = doc.data();
-                });
-                updateStudentTable();
+   <script>
+// Data storage
+let students = {};
+const sections = {
+    'A':{name:'Section A',color:'blue'},
+    'B':{name:'Section B',color:'purple'},
+    'C':{name:'Section C',color:'green'},
+    'D':{name:'Section D',color:'red'},
+    'E':{name:'Section E',color:'amber'}
+};
+let currentSection = '';
+let currentStudent = '';
+let currentQuarter = 1;
+let currentChartType = 'quarter';
+let performanceChart = null;
+
+// Initialize app
+document.addEventListener('DOMContentLoaded', function() {
+    // Register Firestore snapshot ONCE
+    if (window.db) {
+        db.collection("students").onSnapshot((querySnapshot) => {
+            students = {};
+            querySnapshot.forEach((doc) => {
+                students[doc.id] = doc.data();
             });
-            
-            document.getElementById('backToSectionBtn').addEventListener('click', () => {
-                showView('sectionStudentsView');
-                populateSectionStudents(currentSection);
-            });
-            
-            // Student modal
-            document.getElementById('addStudentBtn').addEventListener('click', () => openStudentModal());
-            document.getElementById('addStudentToSectionBtn').addEventListener('click', () => openStudentModal(currentSection));
-            document.getElementById('closeStudentModal').addEventListener('click', closeStudentModal);
-            document.getElementById('cancelStudentBtn').addEventListener('click', closeStudentModal);
-            document.getElementById('studentForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                saveStudent();
-            });
-            
-            // Photo upload and link options
-            document.getElementById('uploadPhotoBtn').addEventListener('click', simulatePhotoUpload);
-            document.getElementById('linkPhotoBtn').addEventListener('click', togglePhotoUrlInput);
-            document.getElementById('photoUrl').addEventListener('input', previewPhotoUrl);
-            
-            
-            // Edit student
-            document.getElementById('editStudentBtn').addEventListener('click', () => {
-                if (currentStudent) openStudentModal(null, currentStudent);
-            });
-            
-            // Quarter tabs
-            document.querySelectorAll('.quarter-tab').forEach(tab => {
-                tab.addEventListener('click', function() {
-                    setActiveQuarter(parseInt(this.getAttribute('data-quarter')));
-                });
-            });
-            function saveStudent() {
-            const id = document.getElementById('studentIdInput').value.trim();
-            const firstName = document.getElementById('firstName').value.trim();
-            const lastName = document.getElementById('lastName').value.trim();
-            const section = document.getElementById('sectionSelect').value;
-            const description = document.getElementById('description').value.trim();
-            const email = document.getElementById('email').value.trim();
-            const phone = document.getElementById('phone').value.trim();
-            let photo = null;
-            const photoUrl = document.getElementById('photoUrl').value.trim();
-            if (photoUrl) {
-                photo = photoUrl;
-            } else if (!document.getElementById('photoPreviewImg').classList.contains('hidden')) {
-                photo = document.getElementById('photoPreviewImg').src;
-            }
-
-            let studentData = {
-                id, firstName, lastName, section, description, email, phone, photo
-            };
-            if (!students[id]) {
-                studentData.grades = {
-                    1: initGrades(),
-                    2: initGrades(),
-                    3: initGrades(),
-                    4: initGrades()
-                };
-            } else {
-                studentData.grades = students[id].grades;
-            }
-
-            db.collection("students").doc(id).set(studentData)
-                .then(() => {
-                    closeStudentModal();
-                })
-                .catch((error) => {
-                    alert("Error saving student: " + error.message);
-                });
-        }
-
-        function updateStudentTable() {
-            // You need to implement this to update your student list/table UI
-            // Example: render students in a table or list using the global "students" object
-            // For now, just log to console
-            console.log('Student data updated:', students);
-        }
-
-        function closeStudentModal() {
-            document.getElementById('studentModal').classList.add('hidden');
-        }
-
-        function togglePhotoUrlInput() {
-            const container = document.getElementById('photoUrlContainer');
-            container.classList.toggle('hidden');
-            if (!container.classList.contains('hidden')) {
-                document.getElementById('photoUrl').focus();
-            }
-        }
-
-        function previewPhotoUrl() {
-            const url = document.getElementById('photoUrl').value.trim();
-            if (url) {
-                document.getElementById('photoPreviewImg').src = url;
-                document.getElementById('photoPreviewImg').classList.remove('hidden');
-                document.getElementById('photoInitials').classList.add('hidden');
-                document.getElementById('photoPreviewImg').onerror = function() {
-                    this.classList.add('hidden');
-                    document.getElementById('photoInitials').classList.remove('hidden');
-                    alert('Unable to load image from URL. Please check the link and try again.');
-                };
-            }
-        }
-
-        function simulatePhotoUpload() {
-            const colors = ['1abc9c', '2ecc71', '3498db', 'e74c3c', 'f39c12', '9b59b6', '34495e'];
-            const randomColor = colors[Math.floor(Math.random() * colors.length)];
-            const firstName = document.getElementById('firstName').value || 'Student';
-            const lastName = document.getElementById('lastName').value || '';
-            const initials = (firstName.charAt(0) + (lastName.charAt(0) || '')).toUpperCase();
-            const svg = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
-                    <rect width="100" height="100" fill="#${randomColor}"/>
-                    <text x="50%" y="54%" text-anchor="middle" fill="#fff" font-size="38" font-family="Arial" dy=".3em">${initials}</text>
-                </svg>
-            `;
-            const svgUrl = "data:image/svg+xml;base64," + btoa(svg);
-            document.getElementById('photoPreviewImg').src = svgUrl;
-            document.getElementById('photoPreviewImg').classList.remove('hidden');
-            document.getElementById('photoInitials').classList.add('hidden');
-        }
-
-        function initGrades() {
-            // Return an object with default grade values
-            return {
-                written: 0,
-                performance: 0,
-                quarterly: 0
-            };
-        }
-
-        function showAddSectionModal() {
-            // You can implement section add logic here, similar to students
-            alert('Add Section Modal coming soon!');
-        }
-
-        // Implement other required logic for sections, dashboard, modals, etc.
-            
-            // Grades modal
-            document.getElementById('editGradesBtn').addEventListener('click', () => {
-                if (currentStudent) openGradesModal();
-            });
-            document.getElementById('closeGradesModal').addEventListener('click', closeGradesModal);
-            document.getElementById('cancelGradesBtn').addEventListener('click', closeGradesModal);
-            document.getElementById('gradesForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                saveGrades();
-            });
-            
-            // Add grade components
-            document.getElementById('addPerformanceTaskBtn').addEventListener('click', () => addGradeComponent('performanceTasks'));
-            document.getElementById('addWrittenWorkBtn').addEventListener('click', () => addGradeComponent('writtenWorks'));
-            
-            // Chart type
-            document.querySelectorAll('.chart-type-btn').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    setChartType(this.getAttribute('data-type'));
-                    document.querySelectorAll('.chart-type-btn').forEach(b => {
-                        b.className = 'chart-type-btn bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs';
-                    });
-                    this.className = 'chart-type-btn bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs';
-                });
-            });
-            
-            // Search
-            document.getElementById('studentSearch').addEventListener('input', function() {
-                filterStudents(this.value.toLowerCase());
-            });
+            updateStudentTable();
+            updateSectionCounts();
         });
-        
-        // View management
-        function showView(viewId) {
-            ['sectionsView', 'sectionStudentsView', 'studentDashboardView'].forEach(view => {
-                document.getElementById(view).classList.add('hidden');
+    } else {
+        console.warn("Firestore (db) is not initialized.");
+    }
+
+    // Navigation
+    document.getElementById('backToSectionsBtn').addEventListener('click', () => {
+        showView('sectionsView');
+        updateSectionCounts();
+    });
+    document.getElementById('backToSectionBtn').addEventListener('click', () => {
+        showView('sectionStudentsView');
+        populateSectionStudents(currentSection);
+    });
+
+    // Student modal
+    document.getElementById('addStudentBtn').addEventListener('click', () => openStudentModal());
+    document.getElementById('addStudentToSectionBtn').addEventListener('click', () => openStudentModal(currentSection));
+    document.getElementById('closeStudentModal').addEventListener('click', closeStudentModal);
+    document.getElementById('cancelStudentBtn').addEventListener('click', closeStudentModal);
+    document.getElementById('studentForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveStudent();
+    });
+
+    // Photo upload and link options
+    document.getElementById('uploadPhotoBtn').addEventListener('click', simulatePhotoUpload);
+    document.getElementById('linkPhotoBtn').addEventListener('click', togglePhotoUrlInput);
+    document.getElementById('photoUrl').addEventListener('input', previewPhotoUrl);
+
+    // Edit student
+    document.getElementById('editStudentBtn').addEventListener('click', () => {
+        if (currentStudent) openStudentModal(null, currentStudent);
+    });
+
+    // Quarter tabs
+    document.querySelectorAll('.quarter-tab').forEach(tab => {
+        tab.addEventListener('click', function() {
+            setActiveQuarter(parseInt(this.getAttribute('data-quarter')));
+        });
+    });
+
+    // Grades modal
+    document.getElementById('editGradesBtn').addEventListener('click', () => {
+        if (currentStudent) openGradesModal();
+    });
+    document.getElementById('closeGradesModal').addEventListener('click', closeGradesModal);
+    document.getElementById('cancelGradesBtn').addEventListener('click', closeGradesModal);
+    document.getElementById('gradesForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveGrades();
+    });
+
+    // Add grade components
+    document.getElementById('addPerformanceTaskBtn').addEventListener('click', () => addGradeComponent('performanceTasks'));
+    document.getElementById('addWrittenWorkBtn').addEventListener('click', () => addGradeComponent('writtenWorks'));
+
+    // Chart type
+    document.querySelectorAll('.chart-type-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            setChartType(this.getAttribute('data-type'));
+            document.querySelectorAll('.chart-type-btn').forEach(b => {
+                b.className = 'chart-type-btn bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs';
             });
-            document.getElementById(viewId).classList.remove('hidden');
-        }
-        
-        // Section management
-        function viewSection(section) {
-            currentSection = section;
-            document.getElementById('currentSectionTitle').textContent = section;
-            showView('sectionStudentsView');
-            populateSectionStudents(section);
-        }
-        
-        function updateSectionCounts() {
-            const counts = {'A':0,'B':0,'C':0,'D':0,'E':0};
-            Object.values(students).forEach(student => {
-                if (counts.hasOwnProperty(student.section)) counts[student.section]++;
-            });
-            for (const section in counts) {
-                document.getElementById(`section${section}Count`).textContent = counts[section];
-            }
-        }
-        
-        function populateSectionStudents(section) {
-            const tableBody = document.getElementById('sectionStudentsTableBody');
-            const noMsg = document.getElementById('noStudentsMessage');
-            tableBody.innerHTML = '';
-            
-            const sectionStudents = Object.values(students).filter(s => s.section === section);
-            
-            if (sectionStudents.length === 0) {
-                tableBody.classList.add('hidden');
-                noMsg.classList.remove('hidden');
-                return;
-            }
-            
-            tableBody.classList.remove('hidden');
-            noMsg.classList.add('hidden');
-            
-            sectionStudents.forEach(student => {
-                const avg = calculateStudentAverage(student);
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="px-4 py-2 text-sm">${student.id}</td>
-                    <td class="px-4 py-2 text-sm">${student.firstName} ${student.lastName}</td>
-                    <td class="px-4 py-2 text-sm"><span class="px-2 py-1 rounded-full ${getGradeColorClass(avg)}">${avg.toFixed(1)}</span></td>
-                    <td class="px-4 py-2 text-sm">
-                        <button class="text-blue-600 mr-2" onclick="viewStudent('${student.id}')">View</button>
-                        <button class="text-red-600" onclick="deleteStudent('${student.id}')">Delete</button>
-                    </td>
-                `;
-                tableBody.appendChild(row);
-            });
-        }
-        
-        function filterStudents(term) {
-            const rows = document.getElementById('sectionStudentsTableBody').querySelectorAll('tr');
-            rows.forEach(row => {
-                const name = row.cells[1].textContent.toLowerCase();
-                const id = row.cells[0].textContent.toLowerCase();
-                row.style.display = (name.includes(term) || id.includes(term)) ? '' : 'none';
-            });
-        }
-        
-        // Student management
-        function openStudentModal(section = null, studentId = null) {
-            document.getElementById('studentModalTitle').textContent = studentId ? 'Edit Student' : 'Add Student';
-            document.getElementById('studentForm').reset();
-            
-            // Hide photo URL input by default
-            document.getElementById('photoUrlContainer').classList.add('hidden');
-            
-            if (section) document.getElementById('sectionSelect').value = section;
-            
-            // Reset photo preview
-            document.getElementById('photoPreviewImg').classList.add('hidden');
-            document.getElementById('photoInitials').classList.remove('hidden');
-            document.getElementById('photoInitials').querySelector('span').textContent = '?';
-            
-            if (studentId && students[studentId]) {
-                const student = students[studentId];
-                document.getElementById('studentFormId').value = student.id;
-                document.getElementById('firstName').value = student.firstName;
-                document.getElementById('lastName').value = student.lastName;
-                document.getElementById('studentIdInput').value = student.id;
-                document.getElementById('sectionSelect').value = student.section;
-                document.getElementById('description').value = student.description || '';
-                document.getElementById('email').value = student.email;
-                document.getElementById('phone').value = student.phone || '';
-                document.getElementById('studentIdInput').disabled = true;
-                
-                // Show photo if available
-                if (student.photo) {
-                    document.getElementById('photoPreviewImg').src = student.photo;
-                    document.getElementById('photoPreviewImg').classList.remove('hidden');
-                    document.getElementById('photoInitials').classList.add('hidden');
-                    
-                    // If it's a URL (not data URL), show the URL input
-                    if (student.photo.startsWith('http')) {
-                        document.getElementById('photoUrlContainer').classList.remove('hidden');
-                        document.getElementById('photoUrl').value = student.photo;
-                    }
-                } else {
-                    const initials = (student.firstName.charAt(0) + student.lastName.charAt(0)).toUpperCase();
-                    document.getElementById('photoInitials').querySelector('span').textContent = initials;
-                }
-            } else {
-                document.getElementById('studentFormId').value = '';
-                document.getElementById('studentIdInput').disabled = false;
-            }
-            
-            document.getElementById('studentModal').classList.remove('hidden');
-        }
-        
-        function closeStudentModal() {
-            document.getElementById('studentModal').classList.add('hidden');
-        }
-        
-        function togglePhotoUrlInput() {
-            const container = document.getElementById('photoUrlContainer');
-            container.classList.toggle('hidden');
-            
-            if (!container.classList.contains('hidden')) {
-                document.getElementById('photoUrl').focus();
-            }
-        }
-        
-        function previewPhotoUrl() {
-            const url = document.getElementById('photoUrl').value.trim();
-            if (url) {
-                // Preview the image
-                document.getElementById('photoPreviewImg').src = url;
-                document.getElementById('photoPreviewImg').classList.remove('hidden');
-                document.getElementById('photoInitials').classList.add('hidden');
-                
-                // Add error handling for the image
-                document.getElementById('photoPreviewImg').onerror = function() {
-                    // If image fails to load, show initials instead
-                    this.classList.add('hidden');
-                    document.getElementById('photoInitials').classList.remove('hidden');
-                    alert('Unable to load image from URL. Please check the link and try again.');
-                };
-            }
-        }
-        
-        function simulatePhotoUpload() {
-            // Generate a random avatar using a placeholder service
-            const colors = ['1abc9c', '2ecc71', '3498db', 'e74c3c', 'f39c12', '9b59b6', '34495e'];
-            const randomColor = colors[Math.floor(Math.random() * colors.length)];
-            const firstName = document.getElementById('firstName').value || 'Student';
-            const lastName = document.getElementById('lastName').value || '';
-            const initials = (firstName.charAt(0) + (lastName.charAt(0) || '')).toUpperCase();
-            
-            // Create an SVG avatar
-            const svg = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
-                    <rect width="100" height="100" fill="#${randomColor}"/>
-                    <text x="50" y="50" font-family="Arial" font-size="40" fill="white" text-anchor="middle" dominant-baseline="central">${initials}</text>
-                </svg>
-            `;
-            
-            // Convert SVG to data URL
-            const dataUrl = 'data:image/svg+xml;base64,' + btoa(svg);
-            
-            // Update preview
-            document.getElementById('photoPreviewImg').src = dataUrl;
+            this.className = 'chart-type-btn bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs';
+        });
+    });
+
+    // Search
+    document.getElementById('studentSearch').addEventListener('input', function() {
+        filterStudents(this.value.toLowerCase());
+    });
+});
+
+// View management
+function showView(viewId) {
+    ['sectionsView', 'sectionStudentsView', 'studentDashboardView'].forEach(view => {
+        if (document.getElementById(view)) document.getElementById(view).classList.add('hidden');
+    });
+    if (document.getElementById(viewId)) document.getElementById(viewId).classList.remove('hidden');
+}
+
+// Section management
+function viewSection(section) {
+    currentSection = section;
+    document.getElementById('currentSectionTitle').textContent = section;
+    showView('sectionStudentsView');
+    populateSectionStudents(section);
+}
+
+function updateSectionCounts() {
+    const counts = {'A':0,'B':0,'C':0,'D':0,'E':0};
+    Object.values(students).forEach(student => {
+        if (counts.hasOwnProperty(student.section)) counts[student.section]++;
+    });
+    for (const section in counts) {
+        let el = document.getElementById(`section${section}Count`);
+        if (el) el.textContent = counts[section];
+    }
+}
+
+function populateSectionStudents(section) {
+    const tableBody = document.getElementById('sectionStudentsTableBody');
+    const noMsg = document.getElementById('noStudentsMessage');
+    tableBody.innerHTML = '';
+    const sectionStudents = Object.values(students).filter(s => s.section === section);
+    if (sectionStudents.length === 0) {
+        tableBody.classList.add('hidden');
+        noMsg.classList.remove('hidden');
+        return;
+    }
+    tableBody.classList.remove('hidden');
+    noMsg.classList.add('hidden');
+    sectionStudents.forEach(student => {
+        const avg = calculateStudentAverage(student);
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td class="px-4 py-2 text-sm">${student.id}</td>
+            <td class="px-4 py-2 text-sm">${student.firstName} ${student.lastName}</td>
+            <td class="px-4 py-2 text-sm"><span class="px-2 py-1 rounded-full ${getGradeColorClass(avg)}">${avg.toFixed(1)}</span></td>
+            <td class="px-4 py-2 text-sm">
+                <button class="text-blue-600 mr-2" onclick="viewStudent('${student.id}')">View</button>
+                <button class="text-red-600" onclick="deleteStudent('${student.id}')">Delete</button>
+            </td>
+        `;
+        tableBody.appendChild(row);
+    });
+}
+
+function filterStudents(term) {
+    const rows = document.getElementById('sectionStudentsTableBody').querySelectorAll('tr');
+    rows.forEach(row => {
+        const name = row.cells[1].textContent.toLowerCase();
+        const id = row.cells[0].textContent.toLowerCase();
+        row.style.display = (name.includes(term) || id.includes(term)) ? '' : 'none';
+    });
+}
+
+// Student management
+function openStudentModal(section = null, studentId = null) {
+    document.getElementById('studentModalTitle').textContent = studentId ? 'Edit Student' : 'Add Student';
+    document.getElementById('studentForm').reset();
+    document.getElementById('photoUrlContainer').classList.add('hidden');
+    if (section) document.getElementById('sectionSelect').value = section;
+    document.getElementById('photoPreviewImg').classList.add('hidden');
+    document.getElementById('photoInitials').classList.remove('hidden');
+    document.getElementById('photoInitials').querySelector('span').textContent = '?';
+    if (studentId && students[studentId]) {
+        const student = students[studentId];
+        document.getElementById('studentFormId').value = student.id;
+        document.getElementById('firstName').value = student.firstName;
+        document.getElementById('lastName').value = student.lastName;
+        document.getElementById('studentIdInput').value = student.id;
+        document.getElementById('sectionSelect').value = student.section;
+        document.getElementById('description').value = student.description || '';
+        document.getElementById('email').value = student.email;
+        document.getElementById('phone').value = student.phone || '';
+        document.getElementById('studentIdInput').disabled = true;
+        if (student.photo) {
+            document.getElementById('photoPreviewImg').src = student.photo;
             document.getElementById('photoPreviewImg').classList.remove('hidden');
             document.getElementById('photoInitials').classList.add('hidden');
-            
-            // Hide URL input if it was visible
-            document.getElementById('photoUrlContainer').classList.add('hidden');
-            document.getElementById('photoUrl').value = '';
+            if (student.photo.startsWith('http')) {
+                document.getElementById('photoUrlContainer').classList.remove('hidden');
+                document.getElementById('photoUrl').value = student.photo;
+            }
+        } else {
+            const initials = (student.firstName.charAt(0) + student.lastName.charAt(0)).toUpperCase();
+            document.getElementById('photoInitials').querySelector('span').textContent = initials;
         }
-        
-        function saveStudent() {
-            const formId = document.getElementById('studentFormId').value;
-            const id = formId || document.getElementById('studentIdInput').value;
-            const firstName = document.getElementById('firstName').value;
-            const lastName = document.getElementById('lastName').value;
-            const section = document.getElementById('sectionSelect').value;
-            const description = document.getElementById('description').value;
-            const email = document.getElementById('email').value;
-            const phone = document.getElementById('phone').value;
-            
-            // Get photo - prioritize URL if provided
-            let photo = null;
-            const photoUrl = document.getElementById('photoUrl').value.trim();
-            if (photoUrl) {
-                photo = photoUrl;
-            } else if (!document.getElementById('photoPreviewImg').classList.contains('hidden')) {
-                photo = document.getElementById('photoPreviewImg').src;
+    } else {
+        document.getElementById('studentFormId').value = '';
+        document.getElementById('studentIdInput').disabled = false;
+    }
+    document.getElementById('studentModal').classList.remove('hidden');
+}
+
+function closeStudentModal() {
+    document.getElementById('studentModal').classList.add('hidden');
+}
+
+function togglePhotoUrlInput() {
+    const container = document.getElementById('photoUrlContainer');
+    container.classList.toggle('hidden');
+    if (!container.classList.contains('hidden')) {
+        document.getElementById('photoUrl').focus();
+    }
+}
+
+function previewPhotoUrl() {
+    const url = document.getElementById('photoUrl').value.trim();
+    if (url) {
+        document.getElementById('photoPreviewImg').src = url;
+        document.getElementById('photoPreviewImg').classList.remove('hidden');
+        document.getElementById('photoInitials').classList.add('hidden');
+        document.getElementById('photoPreviewImg').onerror = function() {
+            this.classList.add('hidden');
+            document.getElementById('photoInitials').classList.remove('hidden');
+            alert('Unable to load image from URL. Please check the link and try again.');
+        };
+    }
+}
+
+function simulatePhotoUpload() {
+    const colors = ['1abc9c', '2ecc71', '3498db', 'e74c3c', 'f39c12', '9b59b6', '34495e'];
+    const randomColor = colors[Math.floor(Math.random() * colors.length)];
+    const firstName = document.getElementById('firstName').value || 'Student';
+    const lastName = document.getElementById('lastName').value || '';
+    const initials = (firstName.charAt(0) + (lastName.charAt(0) || '')).toUpperCase();
+    const svg = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+            <rect width="100" height="100" fill="#${randomColor}"/>
+            <text x="50%" y="54%" text-anchor="middle" fill="#fff" font-size="38" font-family="Arial" dy=".3em">${initials}</text>
+        </svg>
+    `;
+    const svgUrl = "data:image/svg+xml;base64," + btoa(svg);
+    document.getElementById('photoPreviewImg').src = svgUrl;
+    document.getElementById('photoPreviewImg').classList.remove('hidden');
+    document.getElementById('photoInitials').classList.add('hidden');
+    document.getElementById('photoUrlContainer').classList.add('hidden');
+    document.getElementById('photoUrl').value = '';
+}
+
+function saveStudent() {
+    const formId = document.getElementById('studentFormId').value;
+    const id = formId || document.getElementById('studentIdInput').value.trim();
+    const firstName = document.getElementById('firstName').value.trim();
+    const lastName = document.getElementById('lastName').value.trim();
+    const section = document.getElementById('sectionSelect').value;
+    const description = document.getElementById('description').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+    let photo = null;
+    const photoUrl = document.getElementById('photoUrl').value.trim();
+    if (photoUrl) {
+        photo = photoUrl;
+    } else if (!document.getElementById('photoPreviewImg').classList.contains('hidden')) {
+        photo = document.getElementById('photoPreviewImg').src;
+    }
+    if (!students[id]) {
+        students[id] = {
+            id, firstName, lastName, section, description, email, phone, photo,
+            grades: {
+                1: initGrades(),
+                2: initGrades(),
+                3: initGrades(),
+                4: initGrades()
             }
-            
-            if (!students[id]) {
-                students[id] = {
-                    id, firstName, lastName, section, description, email, phone, photo,
-                    grades: {
-                        1: initGrades(),
-                        2: initGrades(),
-                        3: initGrades(),
-                        4: initGrades()
+        };
+    } else {
+        students[id].firstName = firstName;
+        students[id].lastName = lastName;
+        students[id].section = section;
+        students[id].description = description;
+        students[id].email = email;
+        students[id].phone = phone;
+        students[id].photo = photo;
+    }
+    // If using Firestore, save remotely as well
+    if (window.db) {
+        db.collection("students").doc(id).set(students[id])
+            .then(closeStudentModal)
+            .catch((error) => {
+                alert("Error saving student: " + error.message);
+            });
+    } else {
+        closeStudentModal();
+    }
+    // Update UI
+    if (document.getElementById('sectionsView').classList.contains('hidden')) {
+        if (document.getElementById('sectionStudentsView').classList.contains('hidden')) {
+            if (currentStudent === id) viewStudent(id);
+        } else {
+            populateSectionStudents(currentSection);
+        }
+    } else {
+        updateSectionCounts();
+    }
+}
+
+function deleteStudent(id) {
+    if (confirm('Delete this student?')) {
+        delete students[id];
+        // If using Firestore, delete remotely as well
+        if (window.db) db.collection("students").doc(id).delete();
+        if (currentStudent === id) showView('sectionStudentsView');
+        populateSectionStudents(currentSection);
+        updateSectionCounts();
+    }
+}
+
+function viewStudent(id) {
+    if (!students[id]) return;
+    currentStudent = id;
+    const student = students[id];
+    document.getElementById('studentName').textContent = `${student.firstName} ${student.lastName}`;
+    document.getElementById('studentId').textContent = `ID: ${student.id}`;
+    document.getElementById('studentSection').textContent = `Section ${student.section}`;
+    document.getElementById('studentDescription').textContent = student.description || 'No description available';
+    document.getElementById('studentEmail').textContent = student.email;
+    document.getElementById('studentPhone').textContent = student.phone || 'Not provided';
+    if (student.photo) {
+        document.getElementById('studentPhotoImg').src = student.photo;
+        document.getElementById('studentPhotoImg').classList.remove('hidden');
+        document.getElementById('studentInitialsContainer').classList.add('hidden');
+        document.getElementById('studentPhotoImg').onerror = function() {
+            this.classList.add('hidden');
+            document.getElementById('studentInitialsContainer').classList.remove('hidden');
+            document.getElementById('studentInitials').textContent = (student.firstName.charAt(0) + student.lastName.charAt(0)).toUpperCase();
+        };
+    } else {
+        document.getElementById('studentInitials').textContent = (student.firstName.charAt(0) + student.lastName.charAt(0)).toUpperCase();
+        document.getElementById('studentPhotoImg').classList.add('hidden');
+        document.getElementById('studentInitialsContainer').classList.remove('hidden');
+    }
+    setActiveQuarter(currentQuarter);
+    updateChart();
+    showView('studentDashboardView');
+}
+
+// Grade management
+function initGrades() {
+    return {
+        performanceTasks: [{name:'Task 1',score:0,total:100}],
+        writtenWorks: [{name:'Work 1',score:0,total:100}],
+        quarterlyExam: {score:0,total:100},
+        weights: {performanceTasks:40,writtenWorks:40,quarterlyExam:20}
+    };
+}
+
+function setActiveQuarter(quarter) {
+    currentQuarter = quarter;
+    document.querySelectorAll('.quarter-tab').forEach(tab => {
+        tab.classList.remove('tab-active');
+        tab.classList.add('text-gray-500');
+    });
+    const activeTab = document.querySelector(`.quarter-tab[data-quarter="${quarter}"]`);
+    if (activeTab) {
+        activeTab.classList.add('tab-active');
+        activeTab.classList.remove('text-gray-500');
+    }
+    if (currentStudent) loadQuarterGrades(quarter);
+}
+
+function loadQuarterGrades(quarter) {
+    const student = students[currentStudent];
+    if (!student) return;
+    const grades = student.grades[quarter];
+    const container = document.getElementById('quarterGradesContainer');
+    container.innerHTML = '';
+
+    // Performance Tasks
+    const ptDiv = document.createElement('div');
+    ptDiv.className = 'mb-3';
+    ptDiv.innerHTML = `<p class="text-xs text-gray-500 mb-1">PERFORMANCE TASKS (${grades.weights.performanceTasks}%)</p>`;
+    grades.performanceTasks.forEach(task => {
+        const pct = (task.score/task.total*100).toFixed(1);
+        ptDiv.innerHTML += `
+            <div class="flex justify-between text-sm mb-1">
+                <span>${task.name}</span>
+                <span>${task.score}/${task.total} <span class="text-xs ${getGradeColorClass(pct,true)}">${pct}%</span></span>
+            </div>
+        `;
+    });
+    container.appendChild(ptDiv);
+
+    // Written Works
+    const wwDiv = document.createElement('div');
+    wwDiv.className = 'mb-3';
+    wwDiv.innerHTML = `<p class="text-xs text-gray-500 mb-1">WRITTEN WORKS (${grades.weights.writtenWorks}%)</p>`;
+    grades.writtenWorks.forEach(work => {
+        const pct = (work.score/work.total*100).toFixed(1);
+        wwDiv.innerHTML += `
+            <div class="flex justify-between text-sm mb-1">
+                <span>${work.name}</span>
+                <span>${work.score}/${work.total} <span class="text-xs ${getGradeColorClass(pct,true)}">${pct}%</span></span>
+            </div>
+        `;
+    });
+    container.appendChild(wwDiv);
+
+    // Exam
+    const examDiv = document.createElement('div');
+    const examPct = (grades.quarterlyExam.score/grades.quarterlyExam.total*100).toFixed(1);
+    examDiv.innerHTML = `
+        <p class="text-xs text-gray-500 mb-1">QUARTERLY EXAM (${grades.weights.quarterlyExam}%)</p>
+        <div class="flex justify-between text-sm">
+            <span>Quarterly Exam</span>
+            <span>${grades.quarterlyExam.score}/${grades.quarterlyExam.total} <span class="text-xs ${getGradeColorClass(examPct,true)}">${examPct}%</span></span>
+        </div>
+    `;
+    container.appendChild(examDiv);
+
+    // Average
+    const avg = calcQuarterAvg(grades);
+    document.getElementById('quarterAverage').textContent = avg.toFixed(2);
+    document.getElementById('quarterAverage').className = `text-xl font-bold ${getGradeColorClass(avg)}`;
+}
+
+function openGradesModal() {
+    const student = students[currentStudent];
+    if (!student) return;
+    const grades = student.grades[currentQuarter];
+    document.getElementById('gradesModalTitle').textContent = `Edit Grades - Q${currentQuarter}`;
+
+    // Performance Tasks
+    const ptContainer = document.getElementById('performanceTasksContainer');
+    ptContainer.innerHTML = '';
+    grades.performanceTasks.forEach((task, i) => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center space-x-2';
+        div.innerHTML = `
+            <input type="text" class="pt-name flex-grow px-2 py-1 border rounded text-sm" value="${task.name}">
+            <input type="number" class="pt-score w-12 px-2 py-1 border rounded text-sm" min="0" value="${task.score}">
+            <span>/</span>
+            <input type="number" class="pt-total w-12 px-2 py-1 border rounded text-sm" min="1" value="${task.total}">
+            <button type="button" class="delete-pt text-red-500" data-index="${i}">&times;</button>
+        `;
+        ptContainer.appendChild(div);
+    });
+    ptContainer.querySelectorAll('.delete-pt').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (ptContainer.children.length > 1) this.parentElement.remove();
+        });
+    });
+
+    // Written Works
+    const wwContainer = document.getElementById('writtenWorksContainer');
+    wwContainer.innerHTML = '';
+    grades.writtenWorks.forEach((work, i) => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center space-x-2';
+        div.innerHTML = `
+            <input type="text" class="ww-name flex-grow px-2 py-1 border rounded text-sm" value="${work.name}">
+            <input type="number" class="ww-score w-12 px-2 py-1 border rounded text-sm" min="0" value="${work.score}">
+            <span>/</span>
+            <input type="number" class="ww-total w-12 px-2 py-1 border rounded text-sm" min="1" value="${work.total}">
+            <button type="button" class="delete-ww text-red-500" data-index="${i}">&times;</button>
+        `;
+        wwContainer.appendChild(div);
+    });
+    wwContainer.querySelectorAll('.delete-ww').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (wwContainer.children.length > 1) this.parentElement.remove();
+        });
+    });
+
+    // Exam
+    document.getElementById('quarterlyExamScore').value = grades.quarterlyExam.score;
+    document.getElementById('quarterlyExamTotal').value = grades.quarterlyExam.total;
+
+    document.getElementById('gradesModal').classList.remove('hidden');
+}
+
+function closeGradesModal() {
+    document.getElementById('gradesModal').classList.add('hidden');
+}
+
+function saveGrades() {
+    const student = students[currentStudent];
+    if (!student) return;
+    // Performance Tasks
+    const ptNames = document.querySelectorAll('.pt-name');
+    const ptScores = document.querySelectorAll('.pt-score');
+    const ptTotals = document.querySelectorAll('.pt-total');
+    const performanceTasks = [];
+    for (let i = 0; i < ptNames.length; i++) {
+        performanceTasks.push({
+            name: ptNames[i].value,
+            score: parseInt(ptScores[i].value) || 0,
+            total: parseInt(ptTotals[i].value) || 1
+        });
+    }
+    // Written Works
+    const wwNames = document.querySelectorAll('.ww-name');
+    const wwScores = document.querySelectorAll('.ww-score');
+    const wwTotals = document.querySelectorAll('.ww-total');
+    const writtenWorks = [];
+    for (let i = 0; i < wwNames.length; i++) {
+        writtenWorks.push({
+            name: wwNames[i].value,
+            score: parseInt(wwScores[i].value) || 0,
+            total: parseInt(wwTotals[i].value) || 1
+        });
+    }
+    // Exam
+    const quarterlyExam = {
+        score: parseInt(document.getElementById('quarterlyExamScore').value) || 0,
+        total: parseInt(document.getElementById('quarterlyExamTotal').value) || 1
+    };
+    // Update student grades
+    student.grades[currentQuarter] = {
+        performanceTasks,
+        writtenWorks,
+        quarterlyExam,
+        weights: {performanceTasks:40, writtenWorks:40, quarterlyExam:20}
+    };
+    closeGradesModal();
+    loadQuarterGrades(currentQuarter);
+    updateChart();
+}
+
+function addGradeComponent(type) {
+    const container = document.getElementById(type === 'performanceTasks' ? 'performanceTasksContainer' : 'writtenWorksContainer');
+    const div = document.createElement('div');
+    div.className = 'flex items-center space-x-2';
+    const className = type === 'performanceTasks' ? 'pt' : 'ww';
+    const name = type === 'performanceTasks' ? 'Task ' : 'Work ';
+    const num = container.children.length + 1;
+    div.innerHTML = `
+        <input type="text" class="${className}-name flex-grow px-2 py-1 border rounded text-sm" value="${name}${num}">
+        <input type="number" class="${className}-score w-12 px-2 py-1 border rounded text-sm" min="0" value="0">
+        <span>/</span>
+        <input type="number" class="${className}-total w-12 px-2 py-1 border rounded text-sm" min="1" value="100">
+        <button type="button" class="delete-${className} text-red-500">&times;</button>
+    `;
+    container.appendChild(div);
+    div.querySelector(`.delete-${className}`).addEventListener('click', function() {
+        if (container.children.length > 1) this.parentElement.remove();
+    });
+}
+
+// Helper functions
+function calcComponentAvg(components) {
+    if (components.length === 0) return 0;
+    let totalScore = 0, totalPossible = 0;
+    components.forEach(c => {
+        totalScore += c.score;
+        totalPossible += c.total;
+    });
+    return totalPossible > 0 ? (totalScore / totalPossible) * 100 : 0;
+}
+
+function calcQuarterAvg(grades) {
+    const ptAvg = calcComponentAvg(grades.performanceTasks);
+    const wwAvg = calcComponentAvg(grades.writtenWorks);
+    const examAvg = grades.quarterlyExam.total > 0 ? (grades.quarterlyExam.score / grades.quarterlyExam.total) * 100 : 0;
+    return (
+        (ptAvg * grades.weights.performanceTasks / 100) +
+        (wwAvg * grades.weights.writtenWorks / 100) +
+        (examAvg * grades.weights.quarterlyExam / 100)
+    );
+}
+
+function calculateStudentAverage(student) {
+    let total = 0, count = 0;
+    for (let q = 1; q <= 4; q++) {
+        const avg = calcQuarterAvg(student.grades[q]);
+        if (avg > 0) {
+            total += avg;
+            count++;
+        }
+    }
+    return count > 0 ? total / count : 0;
+}
+
+function getGradeColorClass(grade, isText = false) {
+    if (grade >= 90) return isText ? 'text-green-600' : 'bg-green-100 text-green-800';
+    if (grade >= 80) return isText ? 'text-blue-600' : 'bg-blue-100 text-blue-800';
+    if (grade >= 75) return isText ? 'text-yellow-600' : 'bg-yellow-100 text-yellow-800';
+    return isText ? 'text-red-600' : 'bg-red-100 text-red-800';
+}
+
+function setChartType(type) {
+    currentChartType = type;
+    updateChart();
+}
+
+function updateChart() {
+    const student = students[currentStudent];
+    if (!student || !window.Chart) return;
+    if (performanceChart) performanceChart.destroy();
+    const ctx = document.getElementById('performanceChart').getContext('2d');
+    if (currentChartType === 'quarter') {
+        // Quarterly chart
+        const data = [1,2,3,4].map(q => calcQuarterAvg(student.grades[q]));
+        performanceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+                datasets: [{
+                    label: 'Average',
+                    data: data,
+                    backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                    borderColor: 'rgba(59, 130, 246, 1)',
+                    borderWidth: 2,
+                    tension: 0.3,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
                     }
-                };
-            } else {
-                students[id].firstName = firstName;
-                students[id].lastName = lastName;
-                students[id].section = section;
-                students[id].description = description;
-                students[id].email = email;
-                students[id].phone = phone;
-                students[id].photo = photo;
-            }
-            
-            closeStudentModal();
-            
-            if (document.getElementById('sectionsView').classList.contains('hidden')) {
-                if (document.getElementById('sectionStudentsView').classList.contains('hidden')) {
-                    if (currentStudent === id) viewStudent(id);
-                } else {
-                    populateSectionStudents(currentSection);
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
                 }
-            } else {
-                updateSectionCounts();
             }
-        }
-        
-        function deleteStudent(id) {
-            if (confirm('Delete this student?')) {
-                delete students[id];
-                if (currentStudent === id) showView('sectionStudentsView');
-                populateSectionStudents(currentSection);
-                updateSectionCounts();
-            }
-        }
-        
-        function viewStudent(id) {
-            if (!students[id]) return;
-            
-            currentStudent = id;
-            const student = students[id];
-            
-            document.getElementById('studentName').textContent = `${student.firstName} ${student.lastName}`;
-            document.getElementById('studentId').textContent = `ID: ${student.id}`;
-            document.getElementById('studentSection').textContent = `Section ${student.section}`;
-            document.getElementById('studentDescription').textContent = student.description || 'No description available';
-            document.getElementById('studentEmail').textContent = student.email;
-            document.getElementById('studentPhone').textContent = student.phone || 'Not provided';
-            
-            // Set initials or photo
-            if (student.photo) {
-                document.getElementById('studentPhotoImg').src = student.photo;
-                document.getElementById('studentPhotoImg').classList.remove('hidden');
-                document.getElementById('studentInitialsContainer').classList.add('hidden');
-                
-                // Add error handling for the image
-                document.getElementById('studentPhotoImg').onerror = function() {
-                    // If image fails to load, show initials instead
-                    this.classList.add('hidden');
-                    document.getElementById('studentInitialsContainer').classList.remove('hidden');
-                    document.getElementById('studentInitials').textContent = (student.firstName.charAt(0) + student.lastName.charAt(0)).toUpperCase();
-                };
-            } else {
-                document.getElementById('studentInitials').textContent = (student.firstName.charAt(0) + student.lastName.charAt(0)).toUpperCase();
-                document.getElementById('studentPhotoImg').classList.add('hidden');
-                document.getElementById('studentInitialsContainer').classList.remove('hidden');
-            }
-            
-            setActiveQuarter(currentQuarter);
-            updateChart();
-            
-            showView('studentDashboardView');
-        }
-        
-        // Grade management
-        function initGrades() {
-            return {
-                performanceTasks: [{name:'Task 1',score:0,total:100}],
-                writtenWorks: [{name:'Work 1',score:0,total:100}],
-                quarterlyExam: {score:0,total:100},
-                weights: {performanceTasks:40,writtenWorks:40,quarterlyExam:20}
-            };
-        }
-        
-        function setActiveQuarter(quarter) {
-            currentQuarter = quarter;
-            document.querySelectorAll('.quarter-tab').forEach(tab => {
-                tab.classList.remove('tab-active');
-                tab.classList.add('text-gray-500');
-            });
-            const activeTab = document.querySelector(`.quarter-tab[data-quarter="${quarter}"]`);
-            activeTab.classList.add('tab-active');
-            activeTab.classList.remove('text-gray-500');
-            
-            if (currentStudent) loadQuarterGrades(quarter);
-        }
-        
-        function loadQuarterGrades(quarter) {
-            const student = students[currentStudent];
-            if (!student) return;
-            
-            const grades = student.grades[quarter];
-            const container = document.getElementById('quarterGradesContainer');
-            container.innerHTML = '';
-            
-            // Performance Tasks
-            const ptDiv = document.createElement('div');
-            ptDiv.className = 'mb-3';
-            ptDiv.innerHTML = `<p class="text-xs text-gray-500 mb-1">PERFORMANCE TASKS (${grades.weights.performanceTasks}%)</p>`;
-            
-            grades.performanceTasks.forEach(task => {
-                const pct = (task.score/task.total*100).toFixed(1);
-                ptDiv.innerHTML += `
-                    <div class="flex justify-between text-sm mb-1">
-                        <span>${task.name}</span>
-                        <span>${task.score}/${task.total} <span class="text-xs ${getGradeColorClass(pct,true)}">${pct}%</span></span>
-                    </div>
-                `;
-            });
-            container.appendChild(ptDiv);
-            
-            // Written Works
-            const wwDiv = document.createElement('div');
-            wwDiv.className = 'mb-3';
-            wwDiv.innerHTML = `<p class="text-xs text-gray-500 mb-1">WRITTEN WORKS (${grades.weights.writtenWorks}%)</p>`;
-            
-            grades.writtenWorks.forEach(work => {
-                const pct = (work.score/work.total*100).toFixed(1);
-                wwDiv.innerHTML += `
-                    <div class="flex justify-between text-sm mb-1">
-                        <span>${work.name}</span>
-                        <span>${work.score}/${work.total} <span class="text-xs ${getGradeColorClass(pct,true)}">${pct}%</span></span>
-                    </div>
-                `;
-            });
-            container.appendChild(wwDiv);
-            
-            // Exam
-            const examDiv = document.createElement('div');
-            const examPct = (grades.quarterlyExam.score/grades.quarterlyExam.total*100).toFixed(1);
-            examDiv.innerHTML = `
-                <p class="text-xs text-gray-500 mb-1">QUARTERLY EXAM (${grades.weights.quarterlyExam}%)</p>
-                <div class="flex justify-between text-sm">
-                    <span>Quarterly Exam</span>
-                    <span>${grades.quarterlyExam.score}/${grades.quarterlyExam.total} <span class="text-xs ${getGradeColorClass(examPct,true)}">${examPct}%</span></span>
-                </div>
-            `;
-            container.appendChild(examDiv);
-            
-            // Average
-            const avg = calcQuarterAvg(grades);
-            document.getElementById('quarterAverage').textContent = avg.toFixed(2);
-            document.getElementById('quarterAverage').className = `text-xl font-bold ${getGradeColorClass(avg)}`;
-        }
-        
-        function openGradesModal() {
-            const student = students[currentStudent];
-            if (!student) return;
-            
-            const grades = student.grades[currentQuarter];
-            document.getElementById('gradesModalTitle').textContent = `Edit Grades - Q${currentQuarter}`;
-            
-            // Performance Tasks
-            const ptContainer = document.getElementById('performanceTasksContainer');
-            ptContainer.innerHTML = '';
-            
-            grades.performanceTasks.forEach((task, i) => {
-                const div = document.createElement('div');
-                div.className = 'flex items-center space-x-2';
-                div.innerHTML = `
-                    <input type="text" class="pt-name flex-grow px-2 py-1 border rounded text-sm" value="${task.name}">
-                    <input type="number" class="pt-score w-12 px-2 py-1 border rounded text-sm" min="0" value="${task.score}">
-                    <span>/</span>
-                    <input type="number" class="pt-total w-12 px-2 py-1 border rounded text-sm" min="1" value="${task.total}">
-                    <button type="button" class="delete-pt text-red-500" data-index="${i}">&times;</button>
-                `;
-                ptContainer.appendChild(div);
-            });
-            
-            ptContainer.querySelectorAll('.delete-pt').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    if (ptContainer.children.length > 1) this.parentElement.remove();
-                });
-            });
-            
-            // Written Works
-            const wwContainer = document.getElementById('writtenWorksContainer');
-            wwContainer.innerHTML = '';
-            
-            grades.writtenWorks.forEach((work, i) => {
-                const div = document.createElement('div');
-                div.className = 'flex items-center space-x-2';
-                div.innerHTML = `
-                    <input type="text" class="ww-name flex-grow px-2 py-1 border rounded text-sm" value="${work.name}">
-                    <input type="number" class="ww-score w-12 px-2 py-1 border rounded text-sm" min="0" value="${work.score}">
-                    <span>/</span>
-                    <input type="number" class="ww-total w-12 px-2 py-1 border rounded text-sm" min="1" value="${work.total}">
-                    <button type="button" class="delete-ww text-red-500" data-index="${i}">&times;</button>
-                `;
-                wwContainer.appendChild(div);
-            });
-            
-            wwContainer.querySelectorAll('.delete-ww').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    if (wwContainer.children.length > 1) this.parentElement.remove();
-                });
-            });
-            
-            // Exam
-            document.getElementById('quarterlyExamScore').value = grades.quarterlyExam.score;
-            document.getElementById('quarterlyExamTotal').value = grades.quarterlyExam.total;
-            
-            document.getElementById('gradesModal').classList.remove('hidden');
-        }
-        
-        function closeGradesModal() {
-            document.getElementById('gradesModal').classList.add('hidden');
-        }
-        
-        function saveGrades() {
-            const student = students[currentStudent];
-            if (!student) return;
-            
-            // Performance Tasks
-            const ptNames = document.querySelectorAll('.pt-name');
-            const ptScores = document.querySelectorAll('.pt-score');
-            const ptTotals = document.querySelectorAll('.pt-total');
-            
-            const performanceTasks = [];
-            for (let i = 0; i < ptNames.length; i++) {
-                performanceTasks.push({
-                    name: ptNames[i].value,
-                    score: parseInt(ptScores[i].value) || 0,
-                    total: parseInt(ptTotals[i].value) || 1
-                });
-            }
-            
-            // Written Works
-            const wwNames = document.querySelectorAll('.ww-name');
-            const wwScores = document.querySelectorAll('.ww-score');
-            const wwTotals = document.querySelectorAll('.ww-total');
-            
-            const writtenWorks = [];
-            for (let i = 0; i < wwNames.length; i++) {
-                writtenWorks.push({
-                    name: wwNames[i].value,
-                    score: parseInt(wwScores[i].value) || 0,
-                    total: parseInt(wwTotals[i].value) || 1
-                });
-            }
-            
-            // Exam
-            const quarterlyExam = {
-                score: parseInt(document.getElementById('quarterlyExamScore').value) || 0,
-                total: parseInt(document.getElementById('quarterlyExamTotal').value) || 1
-            };
-            
-            // Update student grades
-            student.grades[currentQuarter] = {
-                performanceTasks,
-                writtenWorks,
-                quarterlyExam,
-                weights: {performanceTasks:40, writtenWorks:40, quarterlyExam:20}
-            };
-            
-            closeGradesModal();
-            loadQuarterGrades(currentQuarter);
-            updateChart();
-        }
-        
-        function addGradeComponent(type) {
-            const container = document.getElementById(type === 'performanceTasks' ? 'performanceTasksContainer' : 'writtenWorksContainer');
-            const div = document.createElement('div');
-            div.className = 'flex items-center space-x-2';
-            
-            const className = type === 'performanceTasks' ? 'pt' : 'ww';
-            const name = type === 'performanceTasks' ? 'Task ' : 'Work ';
-            const num = container.children.length + 1;
-            
-            div.innerHTML = `
-                <input type="text" class="${className}-name flex-grow px-2 py-1 border rounded text-sm" value="${name}${num}">
-                <input type="number" class="${className}-score w-12 px-2 py-1 border rounded text-sm" min="0" value="0">
-                <span>/</span>
-                <input type="number" class="${className}-total w-12 px-2 py-1 border rounded text-sm" min="1" value="100">
-                <button type="button" class="delete-${className} text-red-500">&times;</button>
-            `;
-            
-            container.appendChild(div);
-            
-            div.querySelector(`.delete-${className}`).addEventListener('click', function() {
-                if (container.children.length > 1) this.parentElement.remove();
-            });
-        }
-        
-        // Helper functions
-        function calcComponentAvg(components) {
-            if (components.length === 0) return 0;
-            let totalScore = 0, totalPossible = 0;
-            components.forEach(c => {
-                totalScore += c.score;
-                totalPossible += c.total;
-            });
-            return totalPossible > 0 ? (totalScore / totalPossible) * 100 : 0;
-        }
-        
-        function calcQuarterAvg(grades) {
-            const ptAvg = calcComponentAvg(grades.performanceTasks);
-            const wwAvg = calcComponentAvg(grades.writtenWorks);
-            const examAvg = grades.quarterlyExam.total > 0 ? (grades.quarterlyExam.score / grades.quarterlyExam.total) * 100 : 0;
-            
-            return (
-                (ptAvg * grades.weights.performanceTasks / 100) +
-                (wwAvg * grades.weights.writtenWorks / 100) +
-                (examAvg * grades.weights.quarterlyExam / 100)
-            );
-        }
-        
-        function calculateStudentAverage(student) {
-            let total = 0, count = 0;
-            for (let q = 1; q <= 4; q++) {
-                const avg = calcQuarterAvg(student.grades[q]);
-                if (avg > 0) {
-                    total += avg;
-                    count++;
+        });
+    } else {
+        // Component chart
+        const grades = student.grades[currentQuarter];
+        const ptAvg = calcComponentAvg(grades.performanceTasks);
+        const wwAvg = calcComponentAvg(grades.writtenWorks);
+        const examAvg = grades.quarterlyExam.total > 0 ? (grades.quarterlyExam.score / grades.quarterlyExam.total) * 100 : 0;
+        performanceChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: ['Performance', 'Written', 'Exam'],
+                datasets: [{
+                    data: [ptAvg, wwAvg, examAvg],
+                    backgroundColor: [
+                        'rgba(59, 130, 246, 0.6)',
+                        'rgba(139, 92, 246, 0.6)',
+                        'rgba(16, 185, 129, 0.6)'
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
                 }
             }
-            return count > 0 ? total / count : 0;
-        }
-        
-        function getGradeColorClass(grade, isText = false) {
-            if (grade >= 90) return isText ? 'text-green-600' : 'bg-green-100 text-green-800';
-            if (grade >= 80) return isText ? 'text-blue-600' : 'bg-blue-100 text-blue-800';
-            if (grade >= 75) return isText ? 'text-yellow-600' : 'bg-yellow-100 text-yellow-800';
-            return isText ? 'text-red-600' : 'bg-red-100 text-red-800';
-        }
-        
-        function setChartType(type) {
-            currentChartType = type;
-            updateChart();
-        }
-        
-        function updateChart() {
-            const student = students[currentStudent];
-            if (!student) return;
-            
-            if (performanceChart) performanceChart.destroy();
-            
-            const ctx = document.getElementById('performanceChart').getContext('2d');
-            
-            if (currentChartType === 'quarter') {
-                // Quarterly chart
-                const data = [1,2,3,4].map(q => calcQuarterAvg(student.grades[q]));
-                
-                performanceChart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: ['Q1', 'Q2', 'Q3', 'Q4'],
-                        datasets: [{
-                            label: 'Average',
-                            data: data,
-                            backgroundColor: 'rgba(59, 130, 246, 0.2)',
-                            borderColor: 'rgba(59, 130, 246, 1)',
-                            borderWidth: 2,
-                            tension: 0.3,
-                            fill: true
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                max: 100
-                            }
-                        },
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        }
-                    }
-                });
-            } else {
-                // Component chart
-                const grades = student.grades[currentQuarter];
-                const ptAvg = calcComponentAvg(grades.performanceTasks);
-                const wwAvg = calcComponentAvg(grades.writtenWorks);
-                const examAvg = grades.quarterlyExam.total > 0 ? (grades.quarterlyExam.score / grades.quarterlyExam.total) * 100 : 0;
-                
-                performanceChart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: ['Performance', 'Written', 'Exam'],
-                        datasets: [{
-                            data: [ptAvg, wwAvg, examAvg],
-                            backgroundColor: [
-                                'rgba(59, 130, 246, 0.6)',
-                                'rgba(139, 92, 246, 0.6)',
-                                'rgba(16, 185, 129, 0.6)'
-                            ],
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                max: 100
-                            }
-                        },
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        }
-                    }
-                });
-            }
-        }
-    </script>
-    <script src="firebase-auth.js"></script>
+        });
+    }
+}
+
+function updateStudentTable() {
+    // Implement this to update your student list/table UI as needed
+    // For now, just log to console
+    console.log('Student data updated:', students);
+}
+</script>
+<script src="firebase-auth.js"></script>
 <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'95329f257414b9f5',t:'MTc1MDQ5OTYzNi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
