@@ -407,6 +407,12 @@
             document.getElementById('backToSectionsBtn').addEventListener('click', () => {
                 showView('sectionsView');
                 updateSectionCounts();
+                db.collection("students").onSnapshot((querySnapshot) => {
+                students = {};
+                querySnapshot.forEach((doc) => {
+                    students[doc.id] = doc.data();
+                });
+                updateStudentTable();
             });
             
             document.getElementById('backToSectionBtn').addEventListener('click', () => {
@@ -429,6 +435,7 @@
             document.getElementById('linkPhotoBtn').addEventListener('click', togglePhotoUrlInput);
             document.getElementById('photoUrl').addEventListener('input', previewPhotoUrl);
             
+            
             // Edit student
             document.getElementById('editStudentBtn').addEventListener('click', () => {
                 if (currentStudent) openStudentModal(null, currentStudent);
@@ -440,6 +447,111 @@
                     setActiveQuarter(parseInt(this.getAttribute('data-quarter')));
                 });
             });
+            function saveStudent() {
+            const id = document.getElementById('studentIdInput').value.trim();
+            const firstName = document.getElementById('firstName').value.trim();
+            const lastName = document.getElementById('lastName').value.trim();
+            const section = document.getElementById('sectionSelect').value;
+            const description = document.getElementById('description').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            let photo = null;
+            const photoUrl = document.getElementById('photoUrl').value.trim();
+            if (photoUrl) {
+                photo = photoUrl;
+            } else if (!document.getElementById('photoPreviewImg').classList.contains('hidden')) {
+                photo = document.getElementById('photoPreviewImg').src;
+            }
+
+            let studentData = {
+                id, firstName, lastName, section, description, email, phone, photo
+            };
+            if (!students[id]) {
+                studentData.grades = {
+                    1: initGrades(),
+                    2: initGrades(),
+                    3: initGrades(),
+                    4: initGrades()
+                };
+            } else {
+                studentData.grades = students[id].grades;
+            }
+
+            db.collection("students").doc(id).set(studentData)
+                .then(() => {
+                    closeStudentModal();
+                })
+                .catch((error) => {
+                    alert("Error saving student: " + error.message);
+                });
+        }
+
+        function updateStudentTable() {
+            // You need to implement this to update your student list/table UI
+            // Example: render students in a table or list using the global "students" object
+            // For now, just log to console
+            console.log('Student data updated:', students);
+        }
+
+        function closeStudentModal() {
+            document.getElementById('studentModal').classList.add('hidden');
+        }
+
+        function togglePhotoUrlInput() {
+            const container = document.getElementById('photoUrlContainer');
+            container.classList.toggle('hidden');
+            if (!container.classList.contains('hidden')) {
+                document.getElementById('photoUrl').focus();
+            }
+        }
+
+        function previewPhotoUrl() {
+            const url = document.getElementById('photoUrl').value.trim();
+            if (url) {
+                document.getElementById('photoPreviewImg').src = url;
+                document.getElementById('photoPreviewImg').classList.remove('hidden');
+                document.getElementById('photoInitials').classList.add('hidden');
+                document.getElementById('photoPreviewImg').onerror = function() {
+                    this.classList.add('hidden');
+                    document.getElementById('photoInitials').classList.remove('hidden');
+                    alert('Unable to load image from URL. Please check the link and try again.');
+                };
+            }
+        }
+
+        function simulatePhotoUpload() {
+            const colors = ['1abc9c', '2ecc71', '3498db', 'e74c3c', 'f39c12', '9b59b6', '34495e'];
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            const firstName = document.getElementById('firstName').value || 'Student';
+            const lastName = document.getElementById('lastName').value || '';
+            const initials = (firstName.charAt(0) + (lastName.charAt(0) || '')).toUpperCase();
+            const svg = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100">
+                    <rect width="100" height="100" fill="#${randomColor}"/>
+                    <text x="50%" y="54%" text-anchor="middle" fill="#fff" font-size="38" font-family="Arial" dy=".3em">${initials}</text>
+                </svg>
+            `;
+            const svgUrl = "data:image/svg+xml;base64," + btoa(svg);
+            document.getElementById('photoPreviewImg').src = svgUrl;
+            document.getElementById('photoPreviewImg').classList.remove('hidden');
+            document.getElementById('photoInitials').classList.add('hidden');
+        }
+
+        function initGrades() {
+            // Return an object with default grade values
+            return {
+                written: 0,
+                performance: 0,
+                quarterly: 0
+            };
+        }
+
+        function showAddSectionModal() {
+            // You can implement section add logic here, similar to students
+            alert('Add Section Modal coming soon!');
+        }
+
+        // Implement other required logic for sections, dashboard, modals, etc.
             
             // Grades modal
             document.getElementById('editGradesBtn').addEventListener('click', () => {
